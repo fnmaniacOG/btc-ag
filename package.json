@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@bitcoinerlab/secp256k1": "^1.2.0",
+    "@upstash/redis": "^1.38.1",
     "bip322-js": "^3.0.0",
     "bitcoinjs-lib": "^7.0.1",
     "ecpair": "^3.0.1",
