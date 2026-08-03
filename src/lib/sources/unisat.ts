@@ -61,6 +61,18 @@ const LIST_PATH = '/v3/market/collection/auction/list';
 
 type UnisatNftType = 'collection' | 'runes' | 'brc20';
 
+/**
+ * UniSat's book contains developer test collections ("test-collection",
+ * "Test 07"). Because there is no usable price sort, these surface in the
+ * arbitrary window we receive and would otherwise show as real listings.
+ */
+const TEST_SLUGS = /^(test|demo|sample)([-_]|$)/i;
+
+function isTestCollection(o: Record<string, unknown>): boolean {
+  const slug = s(pick(o, 'collectionId', 'collection_id')) ?? '';
+  return TEST_SLUGS.test(slug);
+}
+
 /** "bitcoin-puppets" → "Bitcoin Puppets". The API only gives us the slug. */
 function prettifySlug(slug: string): string {
   return slug
@@ -72,10 +84,12 @@ function prettifySlug(slug: string): string {
 async function fetchByType(nftType: UnisatNftType, q: ListingQuery): Promise<unknown[]> {
   const dir = q.sort === 'price_desc' ? -1 : 1;
 
-  // Collections carry no unitPrice (it is always null), so sorting on it makes
-  // the server return an arbitrary page — which surfaced literal test
-  // collections as the "cheapest" listings. Fungibles do have a unit price.
-  const sort = nftType === 'collection' ? { price: dir } : { unitPrice: dir };
+  // `unitPrice` is the only sort key the schema accepts — `sort.price` is
+  // rejected outright. Collections return unitPrice: null, so this does not
+  // actually order them by cost; we get an arbitrary window of the book and
+  // re-sort locally. Increasing depth is the only way to get closer to a true
+  // floor until UniSat exposes a price sort.
+  const sort = { unitPrice: dir };
 
   const data = await post<unknown>(
     LIST_PATH,
@@ -100,7 +114,9 @@ async function fetchByType(nftType: UnisatNftType, q: ListingQuery): Promise<unk
 async function fetchOrdinals(q: ListingQuery): Promise<UnifiedListing[]> {
   const data = await fetchByType('collection', q);
 
-  return data.map((r) => {
+  return data
+    .filter((r) => !isTestCollection(r as Record<string, unknown>))
+    .map((r) => {
     const o = r as Record<string, unknown>;
     const inscriptionId = s(pick(o, 'inscriptionId', 'nftId', 'inscription_id'));
     const priceSats = n(pick(o, 'price', 'amount', 'totalPrice'));
