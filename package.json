@@ -19,7 +19,7 @@
     "bip322-js": "^3.0.0",
     "bitcoinjs-lib": "^7.0.1",
     "ecpair": "^3.0.1",
-    "next": "15.1.6",
+    "next": "15.5.22",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "sats-connect": "^3.4.0"
