@@ -45,24 +45,39 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return (res as Wrapped<T>).data;
 }
 
-/** Ordinals / collection order book. */
-async function fetchOrdinals(q: ListingQuery): Promise<UnifiedListing[]> {
-  const limit = depthOf(q);
-  const data = await post<unknown>('/v3/market/collection/auction/list', {
+/**
+ * UniSat exposes one order-book endpoint for every asset class, selected by
+ * `filter.nftType`. The server validates it against a fixed enum and rejects
+ * anything else:
+ *
+ *   brc20 | domain | collection | runes | alkanes | brc20Prog | tap
+ *
+ * Ordinals live under `collection` — there is no `inscription` type. The body
+ * is deliberately minimal: the endpoint runs strict schema validation, so
+ * every extra field is another chance to be rejected wholesale.
+ */
+const LIST_PATH = '/v3/market/collection/auction/list';
+
+type UnisatNftType = 'collection' | 'runes' | 'brc20';
+
+async function fetchByType(nftType: UnisatNftType, q: ListingQuery): Promise<unknown[]> {
+  const data = await post<unknown>(LIST_PATH, {
     filter: {
-      nftType: 'inscription',
-      nftConfirm: true,
-      isEnd: false,
+      nftType,
       ...(q.collectionSlug ? { collectionId: q.collectionSlug } : {}),
-      ...(q.minPriceSats ? { minPrice: String(q.minPriceSats) } : {}),
-      ...(q.maxPriceSats ? { maxPrice: String(q.maxPriceSats) } : {}),
     },
     sort: { unitPrice: q.sort === 'price_desc' ? -1 : 1 },
     start: 0,
-    limit,
+    limit: depthOf(q),
   });
+  return asArray(data);
+}
 
-  return asArray(data).map((r) => {
+/** Ordinals / collection order book. */
+async function fetchOrdinals(q: ListingQuery): Promise<UnifiedListing[]> {
+  const data = await fetchByType('collection', q);
+
+  return data.map((r) => {
     const o = r as Record<string, unknown>;
     const inscriptionId = s(pick(o, 'inscriptionId', 'nftId', 'inscription_id'));
     const priceSats = n(pick(o, 'price', 'amount', 'totalPrice'));
@@ -101,18 +116,9 @@ async function fetchOrdinals(q: ListingQuery): Promise<UnifiedListing[]> {
 
 /** Runes order book. UniSat sells runes in lots with a per-unit ask. */
 async function fetchRunes(q: ListingQuery): Promise<UnifiedListing[]> {
-  const limit = depthOf(q);
-  const data = await post<unknown>('/v3/market/runes/auction/list', {
-    filter: {
-      isEnd: false,
-      ...(q.q ? { tick: q.q.toUpperCase() } : {}),
-    },
-    sort: { unitPrice: q.sort === 'price_desc' ? -1 : 1 },
-    start: 0,
-    limit,
-  });
+  const data = await fetchByType('runes', q);
 
-  return asArray(data).map((r) => {
+  return data.map((r) => {
     const o = r as Record<string, unknown>;
     const runeName = s(pick(o, 'rune', 'runeName', 'spacedRune', 'tick')) ?? 'RUNE';
     const priceSats = n(pick(o, 'price', 'amount', 'totalPrice'));
@@ -145,15 +151,9 @@ async function fetchRunes(q: ListingQuery): Promise<UnifiedListing[]> {
 
 /** BRC-20 order book. */
 async function fetchBrc20(q: ListingQuery): Promise<UnifiedListing[]> {
-  const limit = depthOf(q);
-  const data = await post<unknown>('/v3/market/brc20/auction/list', {
-    filter: { isEnd: false, ...(q.q ? { tick: q.q.toLowerCase() } : {}) },
-    sort: { unitPrice: 1 },
-    start: 0,
-    limit,
-  });
+  const data = await fetchByType('brc20', q);
 
-  return asArray(data).map((r) => {
+  return data.map((r) => {
     const o = r as Record<string, unknown>;
     const tick = s(pick(o, 'tick', 'ticker')) ?? 'brc20';
     const priceSats = n(pick(o, 'price', 'amount'));
