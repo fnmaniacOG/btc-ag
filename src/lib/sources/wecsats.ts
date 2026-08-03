@@ -58,7 +58,7 @@ export const wecsats: MarketSource = {
   url: 'https://wecsats.com',
   assetTypes: ['rare-sat'],
   configNote:
-    'No published API. Override WECSATS_BASE / WECSATS_LISTINGS_PATH to point at the live JSON route; WECSATS_API_KEY optional.',
+    'Disabled: wecsats.io appears to be a rare-sat explorer, not an order book — no public listings API found. Set WECSATS_ENABLED=true plus WECSATS_BASE / WECSATS_LISTINGS_PATH if you locate one.',
 
   isConfigured: () => cfg.enabled,
 

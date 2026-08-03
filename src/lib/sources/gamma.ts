@@ -27,7 +27,7 @@ export const gamma: MarketSource = {
   url: 'https://gamma.io',
   assetTypes: ['ordinal'],
   configNote:
-    'Public marketplace endpoint. Override GAMMA_BASE / GAMMA_LISTINGS_PATH if Gamma moves the route; GAMMA_API_KEY is optional.',
+    'Returning 404 — the guessed route is wrong and Gamma blocks server-side discovery. Find the real one in browser DevTools → Network on gamma.io/ordinals, then set GAMMA_BASE / GAMMA_LISTINGS_PATH.',
 
   isConfigured: () => cfg.enabled,
 

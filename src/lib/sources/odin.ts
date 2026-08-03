@@ -16,11 +16,25 @@ import { asArray, depthOf, makeListing, n, pick, s, ts, wants } from './base';
 
 const cfg = config.sources.odin;
 
-/** Odin quotes prices in millisats per token unit on the curve. */
-function toSatsPerToken(raw: number, divisibility: number): number {
-  if (!raw) return 0;
-  const perUnit = raw / 1000; // millisats → sats
-  return divisibility > 0 ? perUnit * 10 ** divisibility : perUnit;
+/**
+ * Odin's price units, derived from real API responses.
+ *
+ * Observed on live tokens: marketcap === price * total_supply / 10^(divisibility
+ * + decimals), and marketcap is denominated in millisats. Working back from
+ * that, the price of one whole token is:
+ *
+ *     satsPerToken = price / 10^decimals / 1000
+ *
+ * These are tiny fractions (a typical token is ~0.0001 sats), so quoting a
+ * single token is useless in a price-sorted book. We quote per 1,000,000
+ * tokens instead, which is how memecoins are actually discussed and which
+ * lands in the same numeric range as the rest of the order book.
+ */
+const QUOTE_LOT = 1_000_000;
+
+function satsPerToken(price: number, decimals: number): number {
+  if (!price) return 0;
+  return price / 10 ** decimals / 1000;
 }
 
 export const odin: MarketSource = {
@@ -43,7 +57,19 @@ export const odin: MarketSource = {
     });
     if (q.q) params.set('search', q.q);
 
-    const res = await request<unknown>(`${cfg.base}/tokens?${params}`, { retries: 1 });
+    const res = await request<unknown>(`${cfg.base}/tokens?${params}`, {
+      retries: 1,
+      // Odin sits behind bot protection that rejects datacenter traffic
+      // carrying a non-browser User-Agent — it answers fine from a laptop and
+      // 403s from a serverless function. A browser UA is what gets through.
+      headers: {
+        'user-agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        accept: 'application/json',
+        referer: 'https://odin.fun/',
+        origin: 'https://odin.fun',
+      },
+    });
 
     return asArray(res)
       .map((r) => {
@@ -52,14 +78,17 @@ export const odin: MarketSource = {
         if (!id) return null;
 
         const ticker = s(pick(o, 'ticker', 'symbol', 'name')) ?? id;
-        const divisibility = n(pick(o, 'divisibility', 'decimals'), 0);
+        // `decimals` drives price scaling; `divisibility` scales raw balances.
+        const decimals = n(pick(o, 'decimals'), 3);
         const priceRaw = n(pick(o, 'price', 'last_price', 'buy_price'));
-        const satsPerToken = toSatsPerToken(priceRaw, divisibility);
+        const perToken = satsPerToken(priceRaw, decimals);
+        if (perToken <= 0) return null;
 
         // A token that has bonded is a real Rune; before that it lives only on
         // the curve. We label it accordingly so filters behave sensibly.
         const bonded = Boolean(pick(o, 'bonded', 'is_bonded'));
         const runeName = s(pick(o, 'rune', 'rune_name'));
+        const holders = n(pick(o, 'holder_count'));
 
         return makeListing({
           source: 'odin',
@@ -67,12 +96,14 @@ export const odin: MarketSource = {
           sourceListingId: id,
           assetType: bonded && runeName ? 'rune' : 'token',
           title: s(pick(o, 'name')) ?? ticker,
-          subtitle: bonded ? 'Bonded → Runes' : 'Bonding curve',
+          subtitle: `${bonded ? 'Bonded → Runes' : 'Bonding curve'} · per 1M tokens${
+            holders ? ` · ${holders} holders` : ''
+          }`,
           ticker,
           runeName,
-          amount: 1,
-          unitPriceSats: satsPerToken,
-          priceSats: Math.max(1, Math.round(satsPerToken)),
+          amount: QUOTE_LOT,
+          unitPriceSats: perToken,
+          priceSats: Math.max(1, Math.round(perToken * QUOTE_LOT)),
           imageUrl: `${cfg.base}/token/${id}/image`,
           listedAt: ts(pick(o, 'created_time', 'createdAt')),
           marketUrl: `https://odin.fun/token/${id}`,

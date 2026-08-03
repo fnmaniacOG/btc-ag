@@ -32,7 +32,7 @@ export const nexus: MarketSource = {
   url: 'https://swap.on.nexus/pools',
   assetTypes: ['pool', 'rune', 'brc20'],
   configNote:
-    'Public pool data. Override NEXUS_BASE / NEXUS_POOLS_PATH if DotSwap moves the route; NEXUS_API_KEY optional.',
+    'Returning 404 — the guessed route is wrong and DotSwap blocks server-side discovery. Find the real one in browser DevTools → Network on swap.on.nexus/pools, then set NEXUS_BASE / NEXUS_POOLS_PATH.',
 
   isConfigured: () => cfg.enabled,
 

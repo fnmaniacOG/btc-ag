@@ -116,8 +116,12 @@ export const config = {
       base: env('ODIN_BASE', 'https://api.odin.fun/v1'),
     },
     wecsats: {
-      enabled: bool('WECSATS_ENABLED', true),
-      base: env('WECSATS_BASE', 'https://wecsats.com/api'),
+      // wecsats.com redirects to wecsats.io, and the live site presents as a
+      // rare-sat explorer rather than an order book — no public listings API
+      // has been found. Off by default so it does not sit red in the status
+      // rail forever; flip it on once a real endpoint is known.
+      enabled: bool('WECSATS_ENABLED', false),
+      base: env('WECSATS_BASE', 'https://wecsats.io/api'),
       apiKey: env('WECSATS_API_KEY'),
     },
     nexus: {
