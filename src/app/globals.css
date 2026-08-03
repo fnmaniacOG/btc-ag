@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: #050505;
+  color: #e8e8ea;
+}
+
+body {
+  font-feature-settings: 'tnum' 1, 'cv01' 1;
+  background-image:
+    radial-gradient(900px 500px at 12% -8%, rgba(247, 147, 26, 0.1), transparent 62%),
+    radial-gradient(700px 420px at 92% 0%, rgba(247, 147, 26, 0.055), transparent 60%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgba(247, 147, 26, 0.32);
+}
+
+/* Thin, orange-on-black scrollbars to match the shell. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a2e #0a0a0b;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-track {
+  background: #0a0a0b;
+}
+*::-webkit-scrollbar-thumb {
+  background: #2a2a2e;
+  border-radius: 6px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #f7931a;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-ink-700 bg-ink-900/70 backdrop-blur-sm;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-md border border-ink-600 bg-ink-850
+           px-2 py-0.5 text-[11px] font-medium text-neutral-400 whitespace-nowrap;
+  }
+
+  .chip-orange {
+    @apply border-orange-700/60 bg-orange-500/10 text-orange-300;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-1.5
+           text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .btn-primary {
+    @apply btn border-orange-500 bg-orange-500 text-black hover:bg-orange-400 hover:border-orange-400;
+  }
+
+  .btn-ghost {
+    @apply btn border-ink-600 bg-ink-850 text-neutral-300 hover:border-orange-600 hover:text-orange-300;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-ink-600 bg-ink-900 px-3 py-2 text-sm text-neutral-100
+           placeholder:text-neutral-600 outline-none transition
+           focus:border-orange-500 focus:ring-1 focus:ring-orange-500/40;
+  }
+
+  .label {
+    @apply mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-500;
+  }
+
+  .skeleton {
+    @apply relative overflow-hidden bg-ink-800;
+  }
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0 -translate-x-full animate-shimmer;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
+  }
+}

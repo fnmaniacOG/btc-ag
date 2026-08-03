@@ -1,0 +1,39 @@
+{
+  "name": "btc-ag",
+  "version": "1.0.0",
+  "private": true,
+  "description": "btc.ag — the Bitcoin marketplace aggregator. Ordinals, Runes & Rare Sats from every major venue, in one order book.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start -p ${PORT:-3000}",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "probe": "tsx scripts/probe-sources.ts",
+    "verify": "tsx scripts/verify.ts",
+    "ordnet": "tsx scripts/ordnet-setup.ts"
+  },
+  "dependencies": {
+    "@bitcoinerlab/secp256k1": "^1.2.0",
+    "bip322-js": "^3.0.0",
+    "bitcoinjs-lib": "^7.0.1",
+    "ecpair": "^3.0.1",
+    "next": "15.1.6",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "sats-connect": "^3.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.1",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

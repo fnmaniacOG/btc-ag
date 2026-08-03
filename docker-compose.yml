@@ -1,0 +1,16 @@
+services:
+  btcag:
+    build: .
+    container_name: btcag
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    env_file:
+      - .env.local
+    environment:
+      NODE_ENV: production
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/api/sources']
+      interval: 30s
+      timeout: 5s
+      retries: 3

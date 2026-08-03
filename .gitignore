@@ -1,0 +1,16 @@
+# No trailing slashes: a bare name ignores both a real directory and a symlink
+# of that name. `node_modules/` would NOT match a symlink.
+node_modules
+.next
+out
+build
+
+.env
+.env.local
+.env*.local
+
+*.tsbuildinfo
+.DS_Store
+npm-debug.log*
+yarn-error.log*
+.vercel
