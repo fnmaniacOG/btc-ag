@@ -31,10 +31,29 @@ import type {
 function identityKey(l: UnifiedListing): string {
   if (l.inscriptionId) return `insc:${l.inscriptionId}`;
   if (l.outpoint) return `utxo:${l.outpoint}`;
+  // Fungible keys are always namespaced by asset type: a BRC-20 and a rune can
+  // share a ticker while being completely different assets.
   if (l.runeId) return `rune:${l.runeId}`;
-  if (l.runeName) return `rune:${l.runeName.toUpperCase()}`;
-  if (l.ticker) return `tick:${l.assetType}:${l.ticker.toUpperCase()}`;
+  if (l.runeName) return `${l.assetType}:rune:${l.runeName.toUpperCase()}`;
+  if (l.ticker) return `${l.assetType}:tick:${l.ticker.toUpperCase()}`;
   return `id:${l.id}`;
+}
+
+/** True when a listing sells a quantity rather than one indivisible thing. */
+function isFungible(l: UnifiedListing): boolean {
+  return !l.inscriptionId && !l.outpoint;
+}
+
+/**
+ * The number two listings of the same asset can actually be compared on.
+ *
+ * For uniques it's the total ask. For fungibles it MUST be the unit price —
+ * comparing the total cost of a 100-token lot against a 200,000-token lot is
+ * meaningless, and produces spectacular nonsense in the spread stat.
+ */
+function comparablePrice(l: UnifiedListing): number | null {
+  if (!isFungible(l)) return l.priceSats;
+  return l.unitPriceSats ?? null;
 }
 
 /**
@@ -61,12 +80,23 @@ export function dedupe(listings: UnifiedListing[]): UnifiedListing[] {
       continue;
     }
 
-    // For fungibles, compare unit price; for uniques, total price.
-    const byPrice = [...group].sort((a, b) => {
-      const au = a.unitPriceSats ?? a.priceSats;
-      const bu = b.unitPriceSats ?? b.priceSats;
-      return au - bu;
-    });
+    // Only listings with a comparable price can be ranked against each other.
+    // A fungible lot with no unit price cannot be compared to anything, so it
+    // stays a separate row rather than corrupting the group.
+    const comparable = group.filter((l) => comparablePrice(l) !== null);
+    const orphans = group.filter((l) => comparablePrice(l) === null);
+
+    out.push(...orphans);
+
+    if (comparable.length === 0) continue;
+    if (comparable.length === 1) {
+      out.push(comparable[0]);
+      continue;
+    }
+
+    const byPrice = [...comparable].sort(
+      (a, b) => comparablePrice(a)! - comparablePrice(b)!,
+    );
 
     const best = byPrice[0];
     const others = byPrice.slice(1);
@@ -77,6 +107,8 @@ export function dedupe(listings: UnifiedListing[]): UnifiedListing[] {
       alsoOn: others.map((o) => ({
         source: o.source,
         priceSats: o.priceSats,
+        // Carried so the spread is computed on like-for-like numbers.
+        unitPriceSats: o.unitPriceSats,
         marketUrl: o.marketUrl,
       })),
     });
@@ -267,7 +299,12 @@ async function fanOut(query: ListingQuery): Promise<AggregateResult> {
   }
 }
 
-/** Best (lowest) ask per venue for one asset — the arbitrage view. */
+/**
+ * Price gap for one asset across venues — the arbitrage view.
+ *
+ * Uses unit price for fungibles and total price for uniques, so the percentage
+ * always means "how much more expensive is the dearest venue".
+ */
 export function spread(listing: UnifiedListing): {
   bestSats: number;
   worstSats: number;
@@ -275,7 +312,18 @@ export function spread(listing: UnifiedListing): {
   spreadPct: number;
 } | null {
   if (!listing.alsoOn?.length) return null;
-  const prices = [listing.priceSats, ...listing.alsoOn.map((o) => o.priceSats)];
+
+  const fungible = isFungible(listing);
+  const own = fungible ? listing.unitPriceSats : listing.priceSats;
+  if (own == null) return null;
+
+  const others = listing.alsoOn
+    .map((o) => (fungible ? o.unitPriceSats : o.priceSats))
+    .filter((v): v is number => typeof v === 'number');
+
+  if (!others.length) return null;
+
+  const prices = [own, ...others];
   const bestSats = Math.min(...prices);
   const worstSats = Math.max(...prices);
   const spreadSats = worstSats - bestSats;

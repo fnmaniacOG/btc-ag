@@ -59,15 +59,14 @@ export const odin: MarketSource = {
 
     const res = await request<unknown>(`${cfg.base}/tokens?${params}`, {
       retries: 1,
-      // Odin sits behind bot protection that rejects datacenter traffic
-      // carrying a non-browser User-Agent — it answers fine from a laptop and
-      // 403s from a serverless function. A browser UA is what gets through.
+      // Odin sits behind bot protection. A browser User-Agent gets further than
+      // a custom one, but do NOT send `origin` — that makes a server request
+      // look like a cross-origin browser call and gets it rejected outright.
       headers: {
         'user-agent':
           'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        accept: 'application/json',
-        referer: 'https://odin.fun/',
-        origin: 'https://odin.fun',
+        accept: 'application/json, text/plain, */*',
+        'accept-language': 'en-US,en;q=0.9',
       },
     });
 

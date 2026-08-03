@@ -110,7 +110,13 @@ export interface UnifiedListing {
   /** True when this exact asset is listed on more than one venue. */
   crossListed?: boolean;
   /** Other venues carrying the same asset, cheapest-first. */
-  alsoOn?: Array<{ source: SourceId; priceSats: number; marketUrl: string }>;
+  alsoOn?: Array<{
+    source: SourceId;
+    priceSats: number;
+    /** Present for fungibles — the only number they can be compared on. */
+    unitPriceSats?: number;
+    marketUrl: string;
+  }>;
 
   /** Can btc.ag build and broadcast the buy PSBT itself? */
   buyable: boolean;

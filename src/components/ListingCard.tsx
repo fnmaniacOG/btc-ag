@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { UnifiedListing } from '@/lib/types';
+import { spread } from '@/lib/aggregate';
 import { btc, commas, shortId, usd } from '@/lib/format';
 
 const RARITY_STYLE: Record<string, string> = {
@@ -33,12 +34,7 @@ export function ListingCard({
 }) {
   const [imgFailed, setImgFailed] = useState(false);
 
-  const spreadPct =
-    listing.alsoOn?.length && listing.priceSats > 0
-      ? ((Math.max(...listing.alsoOn.map((o) => o.priceSats)) - listing.priceSats) /
-          listing.priceSats) *
-        100
-      : 0;
+  const spreadPct = spread(listing)?.spreadPct ?? 0;
 
   const fiat = usd(listing.priceSats, btcPrice);
 

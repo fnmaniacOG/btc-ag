@@ -8,6 +8,7 @@ import { SourceStatus } from '@/components/SourceStatus';
 import { AssetTabs, DEFAULT_FILTERS, Filters, type FilterState } from '@/components/Filters';
 import { BuyModal } from '@/components/BuyModal';
 import type { AggregateResult, ChainStatus, UnifiedListing } from '@/lib/types';
+import { spread } from '@/lib/aggregate';
 import { btc, commas } from '@/lib/format';
 
 const SATS_PER_BTC = 100_000_000;
@@ -90,10 +91,11 @@ export default function Home() {
     if (!listings.length) return null;
     const prices = listings.map((l) => l.priceSats);
     const crossListed = listings.filter((l) => l.crossListed);
+    // Uses the shared spread() helper so fungibles compare on unit price and
+    // uniques on total price. Comparing the two produces absurd percentages.
     const bestSpread = crossListed.reduce((best, l) => {
-      const max = Math.max(...(l.alsoOn?.map((o) => o.priceSats) ?? [0]));
-      const pct = l.priceSats > 0 ? ((max - l.priceSats) / l.priceSats) * 100 : 0;
-      return pct > best ? pct : best;
+      const s = spread(l);
+      return s && s.spreadPct > best ? s.spreadPct : best;
     }, 0);
 
     return {

@@ -23,7 +23,7 @@ import {
   sattributes,
   subsidy,
 } from '../src/lib/sats';
-import { dedupe, sortListings, applyFilters } from '../src/lib/aggregate';
+import { dedupe, sortListings, applyFilters, spread } from '../src/lib/aggregate';
 import type { UnifiedListing } from '../src/lib/types';
 
 let pass = 0;
@@ -155,6 +155,47 @@ const L = (over: Partial<UnifiedListing>): UnifiedListing => ({
   ]);
   eq('runes collapse by ticker', merged.length, 1);
   eq('cheaper UNIT price wins, not cheaper total', merged[0].unitPriceSats, 100);
+}
+
+{
+  // Regression: fungible lots of different sizes must compare on UNIT price.
+  // Comparing totals once produced a "199900% spread" on the live site.
+  const merged = dedupe([
+    L({ id: 'a', assetType: 'brc20', ticker: 'B@AI', priceSats: 100, amount: 100, unitPriceSats: 1 }),
+    L({ id: 'b', source: 'satflow', assetType: 'brc20', ticker: 'B@AI', priceSats: 200_000, amount: 200_000, unitPriceSats: 1 }),
+  ]);
+  eq('same unit price collapses to one row', merged.length, 1);
+  const sp = spread(merged[0]);
+  eq('identical unit prices ⇒ 0% spread, not 199900%', sp ? Math.round(sp.spreadPct) : null, 0);
+}
+
+{
+  // A genuine fungible spread is still detected.
+  const merged = dedupe([
+    L({ id: 'a', assetType: 'rune', runeName: 'DOG', priceSats: 1000, amount: 1000, unitPriceSats: 1 }),
+    L({ id: 'b', source: 'gamma', assetType: 'rune', runeName: 'DOG', priceSats: 300, amount: 200, unitPriceSats: 1.5 }),
+  ]);
+  const sp = spread(merged[0]);
+  eq('real unit-price gap is reported', sp ? Math.round(sp.spreadPct) : null, 50);
+}
+
+{
+  // A BRC-20 and a rune sharing a ticker are different assets.
+  const merged = dedupe([
+    L({ id: 'a', assetType: 'brc20', ticker: 'PEPE', priceSats: 100, unitPriceSats: 1 }),
+    L({ id: 'b', assetType: 'rune', ticker: 'PEPE', priceSats: 900, unitPriceSats: 9 }),
+  ]);
+  eq('ticker collision across asset types stays separate', merged.length, 2);
+}
+
+{
+  // A fungible with no unit price cannot be ranked — it must not corrupt a group.
+  const merged = dedupe([
+    L({ id: 'a', assetType: 'brc20', ticker: 'X', priceSats: 100, unitPriceSats: 1 }),
+    L({ id: 'b', source: 'gamma', assetType: 'brc20', ticker: 'X', priceSats: 5_000_000, unitPriceSats: undefined }),
+  ]);
+  eq('unpriceable fungible stays its own row', merged.length, 2);
+  ok('and is not marked cross-listed', merged.every((m) => !m.crossListed));
 }
 
 {
