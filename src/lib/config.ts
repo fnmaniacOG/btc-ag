@@ -99,7 +99,11 @@ export const config = {
         .filter(Boolean),
     },
     ordnet: {
-      enabled: bool('ORDNET_ENABLED', true),
+      // Off by default: ORD.NET requires the signing wallet to hold 0.01 BTC
+      // confirmed, which is a steep entry price for one more ordinals venue
+      // when UniSat and Ordinals Wallet already cover that asset class.
+      // Set ORDNET_ENABLED=true if you decide it's worth funding.
+      enabled: bool('ORDNET_ENABLED', false),
       base: env('ORDNET_BASE', 'https://ord.net/api/v1'),
       /**
        * Dedicated signing wallet (WIF). ORD.NET tokens last one hour, so a

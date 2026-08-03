@@ -7,6 +7,9 @@
  * slowest part of maintaining an aggregator.
  */
 
+// MUST be first: config.ts reads process.env at module load.
+import { envSummary } from './load-env';
+
 import { SOURCES } from '../src/lib/sources';
 import { getChainStatus } from '../src/lib/chain';
 import { errMessage } from '../src/lib/http';
@@ -18,7 +21,8 @@ const grey = (s: string) => `\x1b[90m${s}\x1b[0m`;
 const orange = (s: string) => `\x1b[38;5;208m${s}\x1b[0m`;
 
 async function main() {
-  console.log(bold(orange('\n  btc.ag source probe\n')));
+  console.log(bold(orange('\n  btc.ag source probe')));
+  console.log(grey(`  env: ${envSummary()}\n`));
 
   try {
     const chain = await getChainStatus();

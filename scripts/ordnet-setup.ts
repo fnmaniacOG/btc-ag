@@ -16,6 +16,9 @@
  * inscriptions, runes, or savings.
  */
 
+// MUST be first: config.ts reads process.env at module load.
+import './load-env';
+
 import { deriveWallet, getOrdnetSession } from '../src/lib/ordnet-auth';
 import { getAddressStats } from '../src/lib/chain';
 import { config } from '../src/lib/config';

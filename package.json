@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "probe": "tsx scripts/probe-sources.ts",
     "verify": "tsx scripts/verify.ts",
-    "ordnet": "tsx scripts/ordnet-setup.ts"
+    "ordnet": "tsx scripts/ordnet-setup.ts",
+    "dump": "tsx scripts/dump-source.ts"
   },
   "dependencies": {
     "@bitcoinerlab/secp256k1": "^1.2.0",

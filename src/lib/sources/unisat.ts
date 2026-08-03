@@ -33,11 +33,12 @@ function headers(): Record<string, string> {
   };
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+async function post<T>(path: string, body: unknown, timeoutMs?: number): Promise<T> {
   const res = await request<Wrapped<T>>(`${cfg.base}${path}`, {
     method: 'POST',
     json: body,
     headers: headers(),
+    ...(timeoutMs ? { timeoutMs } : {}),
   });
   if (res && typeof res === 'object' && 'code' in res && res.code !== 0) {
     throw new Error(`unisat: ${res.msg ?? 'error'} (code ${res.code})`);
@@ -60,16 +61,38 @@ const LIST_PATH = '/v3/market/collection/auction/list';
 
 type UnisatNftType = 'collection' | 'runes' | 'brc20';
 
+/** "bitcoin-puppets" → "Bitcoin Puppets". The API only gives us the slug. */
+function prettifySlug(slug: string): string {
+  return slug
+    .replace(/[-_]+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 async function fetchByType(nftType: UnisatNftType, q: ListingQuery): Promise<unknown[]> {
-  const data = await post<unknown>(LIST_PATH, {
-    filter: {
-      nftType,
-      ...(q.collectionSlug ? { collectionId: q.collectionSlug } : {}),
+  const dir = q.sort === 'price_desc' ? -1 : 1;
+
+  // Collections carry no unitPrice (it is always null), so sorting on it makes
+  // the server return an arbitrary page — which surfaced literal test
+  // collections as the "cheapest" listings. Fungibles do have a unit price.
+  const sort = nftType === 'collection' ? { price: dir } : { unitPrice: dir };
+
+  const data = await post<unknown>(
+    LIST_PATH,
+    {
+      filter: {
+        nftType,
+        ...(q.collectionSlug ? { collectionId: q.collectionSlug } : {}),
+      },
+      sort,
+      start: 0,
+      limit: depthOf(q),
     },
-    sort: { unitPrice: q.sort === 'price_desc' ? -1 : 1 },
-    start: 0,
-    limit: depthOf(q),
-  });
+    // UniSat's BRC-20 book is genuinely slow and regularly exceeds the default
+    // 9s ceiling. Given it is a keyed source we are paying for, wait it out.
+    20_000,
+  );
+
   return asArray(data);
 }
 
@@ -83,6 +106,15 @@ async function fetchOrdinals(q: ListingQuery): Promise<UnifiedListing[]> {
     const priceSats = n(pick(o, 'price', 'amount', 'totalPrice'));
     const collectionSlug = s(pick(o, 'collectionId', 'collection_id'));
     const auctionId = s(pick(o, 'auctionId', 'orderId', 'id')) ?? inscriptionId ?? 'unknown';
+    const inscriptionNumber =
+      pick(o, 'inscriptionNumber') !== undefined ? n(pick(o, 'inscriptionNumber')) : undefined;
+
+    // The order book carries no human collection name — only the slug — so we
+    // render the slug rather than leaving the card blank.
+    const collectionName = collectionSlug ? prettifySlug(collectionSlug) : undefined;
+
+    // `collectionItemName` is the per-item name (e.g. "Bitcoin Puppet #4213").
+    const itemName = s(pick(o, 'collectionItemName', 'inscriptionName', 'name'));
 
     return makeListing({
       source: 'unisat',
@@ -90,21 +122,23 @@ async function fetchOrdinals(q: ListingQuery): Promise<UnifiedListing[]> {
       sourceListingId: auctionId,
       assetType: 'ordinal',
       title:
-        s(pick(o, 'inscriptionName', 'name', 'collectionName')) ??
-        (inscriptionId ? `Inscription ${s(pick(o, 'inscriptionNumber')) ?? ''}`.trim() : 'Ordinal'),
-      subtitle: s(pick(o, 'collectionName')),
+        itemName ??
+        collectionName ??
+        (inscriptionNumber ? `#${inscriptionNumber}` : 'Inscription'),
+      subtitle: collectionName,
       inscriptionId,
-      inscriptionNumber: pick(o, 'inscriptionNumber') !== undefined ? n(pick(o, 'inscriptionNumber')) : undefined,
+      inscriptionNumber,
       contentType: s(pick(o, 'contentType', 'content_type')),
       priceSats,
       outpoint:
         s(pick(o, 'outpoint')) ??
         (s(pick(o, 'txid')) ? `${s(pick(o, 'txid'))}:${n(pick(o, 'vout'))}` : undefined),
-      sellerAddress: s(pick(o, 'sellerAddress', 'address', 'owner')),
+      sellerAddress: s(pick(o, 'address', 'sellerAddress', 'owner')),
       collectionSlug,
-      collectionName: s(pick(o, 'collectionName')),
-      utxoSizeSats: n(pick(o, 'outValue', 'utxoValue'), 546) || undefined,
-      listedAt: ts(pick(o, 'listTime', 'createTime', 'timestamp')),
+      collectionName,
+      // `satoshi` is the value of the UTXO holding the inscription.
+      utxoSizeSats: n(pick(o, 'satoshi', 'outValue', 'utxoValue')) || undefined,
+      listedAt: ts(pick(o, 'onSaleTime', 'listTime', 'createTime', 'timestamp')),
       marketUrl: inscriptionId
         ? `https://unisat.io/market/inscription?inscriptionId=${inscriptionId}`
         : 'https://unisat.io/market',

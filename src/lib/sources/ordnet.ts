@@ -82,7 +82,7 @@ export const ordnet: MarketSource = {
   url: 'https://ord.net',
   assetTypes: ['ordinal'],
   configNote:
-    'Set ORDNET_SIGNING_WIF — a dedicated wallet holding ≥ 0.01 BTC. ORD.NET has no API keys; btc.ag BIP-322 signs its hourly auth challenge automatically.',
+    'Off by default — ORD.NET requires a signing wallet holding 0.01 BTC (~$640). To enable: ORDNET_ENABLED=true plus ORDNET_SIGNING_WIF. btc.ag then BIP-322 signs its hourly auth challenge automatically.',
 
   isConfigured: () => cfg.enabled && Boolean(cfg.signingWif || cfg.token),
 
